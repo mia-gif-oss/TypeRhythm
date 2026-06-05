@@ -440,36 +440,6 @@ function kanaToRomajiTokens(str) {
 // DATA
 // ================================================================
 const PHRASES = {
-  tech: {
-    label: "テック", emoji: "💻", isJP: false,
-    items: [
-      "function returns value", "async await promise", "git commit push",
-      "debug the code", "array map filter", "open source project",
-      "pull request merged", "unit test passed", "deploy to cloud",
-      "refactor the code", "binary search tree", "neural network train",
-      "stack overflow fix", "docker container run", "api endpoint call",
-    ]
-  },
-  music: {
-    label: "ミュージック", emoji: "🎵", isJP: false,
-    items: [
-      "feel the rhythm now", "drop the bass line", "hit every note",
-      "synth wave rising", "jazz improvise", "chord progression",
-      "arpeggio pattern", "velocity attack", "sustain the tone",
-      "stereo panning", "reverb and delay", "master the mix",
-      "kick snare hihat", "melody harmony", "dynamic range wide",
-    ]
-  },
-  space: {
-    label: "スペース", emoji: "🚀", isJP: false,
-    items: [
-      "black hole horizon", "neutron star collapse", "dark matter field",
-      "orbit trajectory", "solar wind blast", "event horizon cross",
-      "quantum entangle", "light year distance", "supernova burst",
-      "galactic core spin", "cosmic ray shower", "warp drive engaged",
-      "nebula formation", "asteroid belt cross", "plasma discharge",
-    ]
-  },
   daily: {
     label: "日常", emoji: "🌅", isJP: true,
     items: [
@@ -506,15 +476,6 @@ const PHRASES = {
       "じごうじとく", "きどあいらく", "むがむちゅう",
     ]
   },
-  motivational: {
-    label: "ハイプ", emoji: "⚡", isJP: false,
-    items: [
-      "never give up now", "push beyond limits", "feel the power rise",
-      "you are unstoppable", "break every record", "conquer the fear",
-      "believe in yourself", "rise above the noise", "unlock your power",
-      "go beyond your best", "forge your own path", "dominate the game",
-    ]
-  },
 };
 
 const MODES = [
@@ -546,7 +507,7 @@ const MODES = [
 const state = {
   screen: "home",     // home | mode | category | game
   phase: "idle",      // idle | countdown | playing | paused | result
-  category: "tech",
+  category: "daily",
   mode: "normal",
   bpm: 120,
   score: 0,
@@ -1109,12 +1070,15 @@ function showCountdown(cb) {
   const overlay = document.getElementById("countdown");
   const num = document.getElementById("countdownNum");
   overlay.classList.remove("hidden");
-  let count = 3;
+  const counts = [3, 2, 1];
+  let i = 0;
   function tick() {
-    num.textContent = count;
-    num.style.animation = "none"; void num.offsetWidth; num.style.animation = "countdownAnim 0.9s ease-out";
-    if (count > 0) { count--; setTimeout(tick, 900); }
-    else {
+    if (i < counts.length) {
+      num.textContent = counts[i];
+      num.style.animation = "none"; void num.offsetWidth; num.style.animation = "countdownAnim 0.9s ease-out";
+      i++;
+      setTimeout(tick, 900);
+    } else {
       num.textContent = "GO!"; num.style.animation = "none"; void num.offsetWidth; num.style.animation = "countdownAnim 0.5s ease-out";
       setTimeout(() => { overlay.classList.add("hidden"); cb(); }, 500);
     }
@@ -1126,35 +1090,49 @@ function showCountdown(cb) {
 // GAME FLOW
 // ================================================================
 function startGame() {
+  // Reset state
+  state.score = 0; state.combo = 0; state.maxCombo = 0;
+  state.totalKeys = 0; state.correctKeys = 0; state.mistakes = 0;
+  state.lives = state.maxLives;
+  state.isJP = PHRASES[state.category].isJP;
+  state.phrases = buildPhraseList();
+  state.phraseIndex = 0;
+  state.currentPhrase = state.phrases[0];
+  state.charIndex = 0;
+  state.tokenIndex = 0; state.tokenInput = "";
+
+  // Show game screen first so UI is ready
+  showScreen("game");
+  updateGameTopBar();
+  document.getElementById("beatLockBar").classList.toggle("hidden", state.mode !== "beatlock");
+
+  if (state.isJP) { buildJPPhrase(state.currentPhrase); renderJPPhrase(); }
+  else renderENPhrase();
+
+  updateStats();
+
+  state.phase = "countdown";
+
   Tone.start().then(() => {
     initAudio();
-    state.phase = "countdown";
     showCountdown(() => {
       state.phase = "playing";
-      state.score = 0; state.combo = 0; state.maxCombo = 0;
-      state.totalKeys = 0; state.correctKeys = 0; state.mistakes = 0;
-      state.lives = state.maxLives;
       state.startTime = Date.now();
-      state.isJP = PHRASES[state.category].isJP;
-      state.phrases = buildPhraseList();
-      state.phraseIndex = 0;
-      state.currentPhrase = state.phrases[0];
-      state.charIndex = 0;
-      state.tokenIndex = 0; state.tokenInput = "";
-
-      if (state.isJP) { buildJPPhrase(state.currentPhrase); renderJPPhrase(); }
-      else renderENPhrase();
-
-      updateStats();
       setupMetronome();
       startMetronome();
       startTimer();
-      updateGameTopBar();
-
-      // Show/hide BeatLock bar
-      document.getElementById("beatLockBar").classList.toggle("hidden", state.mode !== "beatlock");
-
-      showScreen("game");
+      document.getElementById("hiddenInput").focus();
+      document.getElementById("hiddenInput").value = "";
+    });
+  }).catch(() => {
+    // Tone.start failed — proceed without audio
+    initAudio();
+    showCountdown(() => {
+      state.phase = "playing";
+      state.startTime = Date.now();
+      setupMetronome();
+      startMetronome();
+      startTimer();
       document.getElementById("hiddenInput").focus();
       document.getElementById("hiddenInput").value = "";
     });
